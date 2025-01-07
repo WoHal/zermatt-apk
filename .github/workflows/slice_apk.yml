@@ -1,0 +1,47 @@
+name: Slice Zermatt.apk
+on:
+  push:
+
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "Release-Build"
+        default: "Generate release build"
+
+jobs:
+  build:
+    permissions:
+      contents: write
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checking out branch
+        uses: actions/checkout@v3
+
+      - name: Slice apk
+        run: |
+          cd release_r
+          release_path=https://cdn.jsdelivr.net/gh/wohal/zermatt-apk@latest/release_r
+          apk_name=$(ls *.apk)
+          version_code=$(sed -n 's/.*"versionCode":[[:blank:]]*\([0-9]*\),.*$/\1/p' version.json)
+          split --additional-suffix=.part -b 20M $apk_name $apk_name-
+          
+          declare -a urls
+          
+          for i in *.part
+          do
+              urls+=$delim\"$release_path/$i\"
+              delim=","
+          done
+          
+          echo {\"versionCode\": $version_code, \"downloadUrls\": [$urls]} > version-v2.json
+          
+      - name: Push
+        uses: EndBug/add-and-commit@v9
+        with:
+          default_author: github_actions
+          add: |
+            - .
+          message: "chore: bump version to ${{ env.versionCode }}"
+          push: "origin HEAD:main"
